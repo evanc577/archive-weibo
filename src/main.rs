@@ -2,10 +2,13 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
+use futures::StreamExt;
 use reqwest::Client;
 
+use crate::weibo_post::WeiboPost;
+
 mod weibo_auth;
-mod weibo_download;
+mod weibo_post;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -20,12 +23,18 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
     let client = Client::new();
-    
-    println!("Authenticating");
-    let cookie = weibo_auth::weibo_cookie(&client).await?;
 
     println!("Getting posts");
-    weibo_download::download(&client, &cookie, args.user, args.dir).await?;
+    let posts = WeiboPost::get_posts(&client, args.user).await?;
+
+    println!("Downloading posts");
+    futures::stream::iter(posts.iter().map(|p| p.download(&client, &args.dir)))
+        .buffer_unordered(20)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .filter(|r| r.is_err())
+        .for_each(|e| eprintln!("{:?}", e));
 
     Ok(())
 }

@@ -1375,6 +1375,7 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "once_cell",
  "regex",
  "reqwest",
  "serde",
